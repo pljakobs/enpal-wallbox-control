@@ -1,12 +1,13 @@
 # Wallbox Control Script
 
-A Python-based automation tool for controlling wallbox (electric vehicle charger) interfaces via web browser automation. This script provides command-line access to start/stop charging, change charging modes, and monitor wallbox status.
+A Python-based automation tool for controlling yoru enpall wallbox (electric vehicle charger) interfaces via web browser automation. This script provides command-line access to start/stop charging, change charging modes, and monitor wallbox status.
 
 ## Features
 
 - **Headless Operation**: Runs without GUI by default, perfect for servers and automation
-- **Smart Status Checking**: Reads current status and mode before taking actions
-- **Safe Operation**: Prevents conflicting actions (e.g., stopping while finishing)
+- **Smart Status Check/activate  # On Linux/Mac
+# or
+wallbox_env\Scripts\acing**: Reads current status and mode before taking actions
 - **Multiple Actions**: Start/stop charging, set charging modes (eco/full/solar), get status/mode
 - **Configurable**: Easy configuration via config file
 - **Verbose Mode**: Optional detailed output for debugging
@@ -47,7 +48,7 @@ wallbox_env\Scripts\activate     # On Windows
 pip install selenium geckodriver-autoinstaller
 ```
 
-Alternatively, if a `requirements.txt` file is provided:
+Alternatively, use the provided `requirements.txt` 
 
 ```bash
 pip install -r requirements.txt
@@ -79,7 +80,10 @@ Output: `Finishing`, `Ready`, `Charging`, etc.
 
 #### Get Current Mode
 ```bash
-python wallbox.py --get-mode
+python wallbox.py --get-mode)
+echo "Current mode: $MODE"
+```
+t-mode
 ```
 Output: `Eco`, `Full`, `Solar`
 
@@ -161,7 +165,7 @@ The script includes several safety mechanisms:
 # wallbox-auto.sh - Intelligent charging control
 
 # Get current status
-STATUS=$(python wallbox.py --get-status)
+STATUS=$(python wallbo x.py --get-status)
 MODE=$(python wallbox.py --get-mode)
 
 echo "Current status: $STATUS, Mode: $MODE"
