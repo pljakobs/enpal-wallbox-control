@@ -80,8 +80,7 @@ Output: `Finishing`, `Ready`, `Charging`, etc.
 
 #### Get Current Mode
 ```bash
-python wallbox.py --get-mode)
-echo "Current mode: $MODE"
+python wallbox.py --get-mode
 ```
 t-mode
 ```
