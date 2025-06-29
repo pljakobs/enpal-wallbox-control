@@ -1,0 +1,2 @@
+selenium>=4.0.0
+geckodriver-autoinstaller>=0.1.0
