@@ -1,0 +1,56 @@
+[Unit]
+Description=Wallbox Webhook Server
+Documentation=https://github.com/yourusername/wallbox
+After=network-online.target
+Wants=network-online.target
+Requires=network.target
+
+[Service]
+# Working directory
+WorkingDirectory=/home/pjakobs/devel/wallbox
+
+# Command to execute the webhook server
+# Option 1: Use integrated webhook server in main wallbox.py
+ExecStart=/home/pjakobs/devel/wallbox/wallbox_env/bin/python /home/pjakobs/devel/wallbox/wallbox.py --webhook-server
+
+# Option 2: Use standalone webhook server
+# ExecStart=/home/pjakobs/devel/wallbox/wallbox_env/bin/python /home/pjakobs/devel/wallbox/webhook_server.py
+
+# Process management
+Type=simple
+Restart=on-failure
+RestartSec=10
+KillMode=control-group
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Security settings
+User=pjakobs
+Group=pjakobs
+
+# Environment variables
+Environment=PYTHONPATH=/home/pjakobs/devel/wallbox
+Environment=PYTHONUNBUFFERED=1
+
+# Optional: Set webhook port if configurable
+# Environment=WEBHOOK_PORT=8080
+# Environment=WEBHOOK_HOST=0.0.0.0
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wallbox-webhook
+
+# Resource limits
+LimitNOFILE=1024
+MemoryLimit=256M
+
+# Security hardening (optional)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/pjakobs/devel/wallbox
+
+[Install]
+WantedBy=multi-user.target

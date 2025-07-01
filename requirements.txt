@@ -1,3 +1,4 @@
 selenium>=4.0.0
 geckodriver-autoinstaller>=0.1.0
 flask>=2.0.0
+requests>=2.25.0

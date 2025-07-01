@@ -295,8 +295,8 @@ class WallboxController:
                 self.driver = None
 
 
+# Parse command line arguments
 def parse_arguments():
-    """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Control wallbox charging')
     
     # Create mutually exclusive group for main actions
@@ -320,87 +320,141 @@ def parse_arguments():
     
     return parser.parse_args()
 
+# Parse command line arguments
+args = parse_arguments()
 
-def main():
-    """Main execution function"""
-    # Parse command line arguments
-    args = parse_arguments()
-
-    # Handle webhook server mode
-    if args.webhook_server:
-        print("Starting webhook server...")
-        try:
-            from webhook_server import WebhookServer
-            server = WebhookServer()
-            server.run()
-        except ImportError:
-            print("Error: webhook_server.py not found or has import errors.")
-            print("Make sure Flask is installed: pip install flask")
-            sys.exit(1)
-        except KeyboardInterrupt:
-            print("\nWebhook server stopped.")
-            sys.exit(0)
-
-    # Load configuration
-    config = load_config()
-
-    def vprint(*args_to_print, **kwargs):
-        """Print only if verbose mode is enabled"""
-        if args.verbose:
-            print(*args_to_print, **kwargs)
-
-    def always_print(*args_to_print, **kwargs):
-        """Always print (for important messages)"""
-        print(*args_to_print, **kwargs)
-
-    # Create wallbox controller
-    controller = WallboxController(
-        config_file=config,
-        headless=not args.no_headless,
-        verbose=args.verbose
-    )
-
+# Handle webhook server mode
+if args.webhook_server:
+    print("Starting webhook server...")
     try:
-        # Handle different action types
-        if args.get_status:
-            vprint("Requested action: Get status")
-            status = controller.get_status()
-            always_print(status)
-            
-        elif args.get_mode:
-            vprint("Requested action: Get mode")
-            mode = controller.get_mode()
-            always_print(mode)
-            
-        elif args.set_mode:
-            vprint(f"Requested action: Set mode to {args.set_mode}")
-            success = controller.set_mode(args.set_mode)
-            if success:
-                mode = controller.get_mode()
-                always_print(f"Mode set to: {mode}")
-            else:
-                always_print(f"Failed to set mode to {args.set_mode}")
-                
-        elif args.action:
-            vprint(f"Requested action: {args.action}")
-            if args.action == 'start':
-                success = controller.start_charging()
-            elif args.action == 'stop':
-                success = controller.stop_charging()
-            
-            if success:
-                status = controller.get_status()
-                always_print(f"Action '{args.action}' completed. Status: {status}")
-            else:
-                always_print(f"Failed to execute action: {args.action}")
-    
-    except Exception as e:
-        always_print(f"An error occurred: {e}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
+        from webhook_server import WebhookServer
+        server = WebhookServer()
+        server.run()
+    except ImportError:
+        print("Error: webhook_server.py not found or has import errors.")
+        print("Make sure Flask is installed: pip install flask")
         sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nWebhook server stopped.")
+        sys.exit(0)
 
+# Load configuration
+config = load_config()
 
-if __name__ == '__main__':
-    main()
+# Determine what action to take
+if args.get_status:
+    action_type = 'get_status'
+    vprint("Requested action: Get status")
+elif args.get_mode:
+    action_type = 'get_mode'
+    vprint("Requested action: Get mode")
+elif args.set_mode:
+    action_type = 'set_mode'
+    action_value = args.set_mode
+    vprint(f"Requested action: Set mode to {action_value}")
+else:
+    action_type = 'action'
+    action_value = args.action
+    vprint(f"Requested action: {action_value}")
+
+# Install and set up Firefox driver
+geckodriver_autoinstaller.install()
+
+# Check if we should run in headless mode
+def should_run_headless():
+    # If --no-headless is specified, force GUI mode
+    if args.no_headless:
+        return False
+    # Otherwise, default to headless mode
+    return True
+
+# Set up Firefox options
+firefox_options = Options()
+
+if should_run_headless():
+    vprint("Running in headless mode (no GUI)")
+    firefox_options.add_argument("--headless")
+else:
+    vprint("Running with GUI")
+
+# Set up Firefox driver
+driver = webdriver.Firefox(options=firefox_options)
+
+try:
+    # Navigate to the wallbox interface
+    wallbox_url = config.get('wallbox_url', DEFAULT_CONFIG['wallbox_url'])
+    vprint(f"Navigating to wallbox interface: {wallbox_url}")
+    driver.get(wallbox_url)
+    
+    # Wait for page to load
+    timeout = int(config.get('page_load_timeout', DEFAULT_CONFIG['page_load_timeout']))
+    vprint(f"Waiting {timeout} seconds for page to load...")
+    time.sleep(timeout)
+    
+    # Get page title and print it
+    vprint(f"Page title: {driver.title}")
+    
+    # Read current status and mode
+    vprint("Reading current wallbox status and mode...")
+    current_status, current_mode = get_current_status_and_mode(driver)
+    
+    # Handle different action types
+    if action_type == 'get_status':
+        always_print(current_status or 'Unknown')
+        
+    elif action_type == 'get_mode':
+        always_print(current_mode or 'Unknown')
+        
+    elif action_type == 'set_mode':
+        # Check if mode is already set correctly
+        mode_map = {'eco': 'Eco', 'full': 'Full', 'solar': 'Solar'}
+        expected_mode = mode_map[action_value]
+        
+        if current_mode and expected_mode.lower() in current_mode.lower():
+            vprint(f"Mode is already set to {expected_mode}, no action needed")
+            always_print(f"Mode: {current_mode} (no change needed)")
+        else:
+            vprint(f"Setting mode from {current_mode} to {expected_mode}")
+            success = find_and_click_button(driver, action_value)
+            if success:
+                time.sleep(3)
+                new_status, new_mode = get_current_status_and_mode(driver)
+                always_print(f"Mode updated: {current_mode} -> {new_mode}")
+            else:
+                always_print(f"Failed to set mode to {action_value}")
+                
+    elif action_type == 'action':
+        # Check if we should proceed with the action
+        if not should_proceed_with_action(action_value, current_status, current_mode):
+            always_print("Action cancelled based on current status/mode")
+        else:
+            # Find and click the requested button
+            success = find_and_click_button(driver, action_value)
+            
+            if success:
+                # Wait a moment to see the result
+                time.sleep(3)
+                
+                # Read status/mode again to see if anything changed
+                vprint("Reading updated status and mode...")
+                new_status, new_mode = get_current_status_and_mode(driver)
+                if new_status != current_status or new_mode != current_mode:
+                    always_print(f"Status: {current_status} -> {new_status}")
+                    if new_mode != current_mode:
+                        always_print(f"Mode: {current_mode} -> {new_mode}")
+                else:
+                    vprint("No changes detected in status/mode")
+                    always_print(f"Action '{action_value}' completed")
+                    
+            else:
+                always_print(f"Failed to execute action: {action_value}")
+    
+except Exception as e:
+    always_print(f"An error occurred: {e}")
+    if args.verbose:
+        import traceback
+        traceback.print_exc()
+    
+finally:
+    vprint("Closing browser...")
+    driver.quit()

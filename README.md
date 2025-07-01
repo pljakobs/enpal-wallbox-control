@@ -239,6 +239,184 @@ options:
   -v, --verbose         Enable verbose output for debugging
 ```
 
+## Webhook Server
+
+Start a webhook server for remote control via HTTP API:
+
+```bash
+python wallbox.py --webhook-server
+```
+
+The webhook server provides REST API endpoints for remote wallbox control and integrates with Grafana alerting, MQTT, and other automation systems.
+
+#### Webhook Server Endpoints
+
+**Status and Control:**
+- `GET /health` - Health check endpoint
+- `GET /wallbox/status` - Get current wallbox status  
+- `GET /wallbox/mode` - Get current charging mode
+- `POST /wallbox/mode` - Set charging mode (eco/full/solar)
+- `POST /wallbox/start` - Start charging
+- `POST /wallbox/stop` - Stop charging
+
+**Automation Webhooks:**
+- `POST /webhook/grafana` - Grafana alerting webhook for automated responses
+- `POST /webhook/mqtt` - MQTT-style webhook for IoT integration
+
+#### Detailed API Reference
+
+**GET /health**
+```bash
+curl http://localhost:8080/health
+# Response: {"status": "healthy", "timestamp": "2025-07-01T12:00:00", "version": "1.0.0"}
+```
+
+**GET /wallbox/status**
+```bash
+curl http://localhost:8080/wallbox/status
+# Response: {"status": "Ready", "timestamp": "2025-07-01T12:00:00"}
+```
+
+**GET /wallbox/mode**
+```bash
+curl http://localhost:8080/wallbox/mode
+# Response: {"mode": "Eco", "timestamp": "2025-07-01T12:00:00"}
+```
+
+**POST /wallbox/mode**
+```bash
+# Set to solar mode
+curl -X POST http://localhost:8080/wallbox/mode \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "solar"}'
+# Response: {"success": true, "mode": "solar", "timestamp": "2025-07-01T12:00:00"}
+
+# Valid modes: "eco", "full", "solar"
+```
+
+**POST /wallbox/start**
+```bash
+curl -X POST http://localhost:8080/wallbox/start
+# Response: {"success": true, "action": "start", "timestamp": "2025-07-01T12:00:00"}
+```
+
+**POST /wallbox/stop**
+```bash
+curl -X POST http://localhost:8080/wallbox/stop
+# Response: {"success": true, "action": "stop", "timestamp": "2025-07-01T12:00:00"}
+```
+
+**POST /webhook/grafana** (Grafana Alerting Integration)
+```bash
+# High solar production alert (auto-switch to solar mode)
+curl -X POST http://localhost:8080/webhook/grafana \
+  -H "Content-Type: application/json" \
+  -d '{
+    "state": "alerting",
+    "ruleName": "High Solar Production",
+    "message": "Solar production > 5kW"
+  }'
+# Response: {"action": "set_mode_solar", "success": true, "reason": "high_solar_production"}
+
+# Recovery alert (auto-switch back to eco mode)
+curl -X POST http://localhost:8080/webhook/grafana \
+  -H "Content-Type: application/json" \
+  -d '{
+    "state": "ok",
+    "ruleName": "High Solar Production"
+  }'
+# Response: {"action": "set_mode_eco", "success": true, "reason": "solar_production_normalized"}
+```
+
+**POST /webhook/mqtt** (MQTT-style Commands)
+```bash
+# MQTT command to start charging
+curl -X POST http://localhost:8080/webhook/mqtt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "wallbox/command",
+    "message": "{\"command\": \"start\"}"
+  }'
+# Response: {"action": "start", "success": true}
+
+# MQTT command to set mode
+curl -X POST http://localhost:8080/webhook/mqtt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "wallbox/command", 
+    "message": "{\"command\": \"set_mode\", \"mode\": \"solar\"}"
+  }'
+# Response: {"action": "set_mode", "mode": "solar", "success": true}
+
+# Solar production data (auto-switch if > 3kW)
+curl -X POST http://localhost:8080/webhook/mqtt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "solar/production",
+    "message": "{\"production\": 3500}"
+  }'
+# Response: {"action": "auto_switch_to_solar", "success": true, "production": 3500}
+```
+
+#### Authentication
+
+Enable authentication by setting an auth token in `webhook.conf`:
+
+```ini
+[webhook]
+auth_token = your-secret-token-here
+```
+
+Then include the token in requests:
+
+```bash
+curl -H "Authorization: Bearer your-secret-token-here" \
+  http://localhost:8080/wallbox/status
+```
+
+#### Webhook Configuration
+
+Configure the webhook server in `webhook.conf`:
+
+```ini
+[webhook]
+host = 0.0.0.0
+port = 8080
+debug = false
+
+# Optional authentication
+auth_token = your-secret-token-here
+
+# InfluxDB integration
+influxdb_url = http://localhost:8086
+influxdb_token = your-token
+influxdb_org = your-org
+influxdb_bucket = wallbox
+
+# Logging
+log_level = INFO
+wallbox_config = wallbox.conf
+```
+
+#### Running as System Service
+
+Install as a systemd service for automatic startup:
+
+```bash
+# Copy unit file
+sudo cp wallbox_webhook.unit /etc/systemd/system/wallbox-webhook.service
+
+# Enable and start
+sudo systemctl daemon-reload
+sudo systemctl enable wallbox-webhook.service
+sudo systemctl start wallbox-webhook.service
+
+# Check status
+sudo systemctl status wallbox-webhook.service
+```
+
+See [GRAFANA_INTEGRATION.md](GRAFANA_INTEGRATION.md) for detailed automation examples.
+
 ## Dependencies
 
 - **selenium**: Web browser automation
