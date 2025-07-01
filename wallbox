@@ -1,0 +1,28 @@
+#!/bin/bash
+# wallbox-wrapper.sh - Enhanced wrapper for wallbox control
+
+set -e  # Exit on error
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PATH="$SCRIPT_DIR/wallbox_env"
+WALLBOX_SCRIPT="$SCRIPT_DIR/wallbox.py"
+
+# Check if virtual environment exists
+if [ ! -d "$VENV_PATH" ]; then
+    echo "Error: Virtual environment not found at $VENV_PATH"
+    echo "Please run: python3 -m venv wallbox_env"
+    exit 1
+fi
+
+# Check if wallbox.py exists
+if [ ! -f "$WALLBOX_SCRIPT" ]; then
+    echo "Error: wallbox.py not found at $WALLBOX_SCRIPT"
+    exit 1
+fi
+
+# Activate the virtual environment
+source "$VENV_PATH/bin/activate"
+
+# Run wallbox.py with all passed arguments
+python "$WALLBOX_SCRIPT" "$@"
